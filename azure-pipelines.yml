@@ -1,0 +1,86 @@
+# Azure DevOps Pipeline for Razor Pages (.NET 9) with Git Flow and DTAP
+trigger:
+  branches:
+    include:
+      - develop
+      - release/*
+      - main
+      - hotfix/*
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: Build
+    displayName: 'Build Job'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '9.0.x'
+    - script: dotnet build --configuration $(buildConfiguration)
+      displayName: 'Build Solution'
+    - script: dotnet test --configuration $(buildConfiguration) --no-build
+      displayName: 'Run Tests'
+
+- stage: Deploy_Development
+  displayName: 'Deploy to Development'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  jobs:
+  - deployment: DeployDev
+    environment: 'Development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo Deploying to Development environment
+            displayName: 'Deploy Step (replace with actual deployment)'
+
+- stage: Deploy_Test
+  displayName: 'Deploy to Test'
+  dependsOn: Build
+  condition: and(succeeded(), or(startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/')))
+  jobs:
+  - deployment: DeployTest
+    environment: 'Test'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo Deploying to Test environment
+            displayName: 'Deploy Step (replace with actual deployment)'
+
+- stage: Deploy_Acceptance
+  displayName: 'Deploy to Acceptance'
+  dependsOn: Deploy_Test
+  condition: and(succeeded(), or(startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/')))
+  jobs:
+  - deployment: DeployAcceptance
+    environment: 'Acceptance'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo Deploying to Acceptance environment
+            displayName: 'Deploy Step (replace with actual deployment)'
+
+- stage: Deploy_Production
+  displayName: 'Deploy to Production'
+  dependsOn: Deploy_Acceptance
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployProd
+    environment: 'Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo Deploying to Production environment
+            displayName: 'Deploy Step (replace with actual deployment)'
